@@ -26,7 +26,5 @@ aoc20-*.tar
 # Temporary files for e.g. tests
 /tmp
 
-/inputs
-
 .vscode/
 .elixir_ls/
