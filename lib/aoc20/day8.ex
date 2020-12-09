@@ -33,27 +33,31 @@ defmodule Aoc20.Day8 do
     end
   end
 
+  def run_until_loop_or_terminate(instructions) do
+    run_until_loop_or_terminate(instructions, 0, 0, MapSet.new())
+  end
+
   def check_permuted_instruction(instructions, {line, index}) do
     [[_, instruction, sign, amount]] = Regex.scan(~r/(\w+) ([+-])(\d+)/, line)
 
     case instruction do
       "acc" ->
-        run_until_loop_or_terminate(instructions, 0, 0, MapSet.new())
+        run_until_loop_or_terminate(instructions)
 
       "nop" ->
         List.replace_at(instructions, index, "jmp #{sign}#{amount}")
-        |> run_until_loop_or_terminate(0, 0, MapSet.new())
+        |> run_until_loop_or_terminate()
 
       "jmp" ->
         List.replace_at(instructions, index, "nop #{sign}#{amount}")
-        |> run_until_loop_or_terminate(0, 0, MapSet.new())
+        |> run_until_loop_or_terminate()
     end
   end
 
   def run() do
     instructions = File.read!("inputs/day8.txt") |> String.split("\n")
 
-    part1 = run_until_loop_or_terminate(instructions, 0, 0, MapSet.new())
+    part1 = run_until_loop_or_terminate(instructions)
 
     {:ok, part2} =
       instructions
