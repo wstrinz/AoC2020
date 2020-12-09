@@ -41,9 +41,6 @@ defmodule Aoc20.Day1 do
       numbers
       |> find_triplet_2020s
 
-    IO.puts(~s"""
-    Part 1 answer: #{part1}
-    Part 2 answer: #{part2}
-    """)
+    [part1, part2]
   end
 end
