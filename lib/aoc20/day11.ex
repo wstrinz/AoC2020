@@ -97,7 +97,7 @@ defmodule Aoc20.Day11 do
     |> Enum.reject(&is_nil/1)
   end
 
-  def next_cell_state_immediate(grid, cell, x, y) do
+  def next_cell_state_immediate(grid, cell, x, y, _) do
     occupied_neighbors =
       Enum.filter(neighborhood(x, y), fn [nx, ny] ->
         cell_at(grid, nx, ny) == "#"
@@ -116,43 +116,51 @@ defmodule Aoc20.Day11 do
     end
   end
 
-  def next_cell_state_extended(grid, cell, x, y, ray_cache) do
+  def next_cell_state_extended(grid, cell, x, y, step_num, ray_cache, change_cache) do
     if cell == "." do
       "."
     else
-      occupied_neighbors =
-        visible_from(grid, x, y, ray_cache)
-        |> Enum.filter(&(&1 == "#"))
-        |> length()
-
-      case cell do
-        "#" when occupied_neighbors >= 5 ->
-          "L"
-
-        "L" when occupied_neighbors == 0 ->
-          "#"
+      case :ets.lookup(change_cache, {x, y}) do
+        [{_, step}] when step_num - step > 1 ->
+          cell
 
         _ ->
-          cell
+          occupied_neighbors =
+            visible_from(grid, x, y, ray_cache)
+            |> Enum.filter(&(&1 == "#"))
+            |> length()
+
+          case cell do
+            "#" when occupied_neighbors >= 5 ->
+              :ets.insert(change_cache, {{x, y}, step_num})
+              "L"
+
+            "L" when occupied_neighbors == 0 ->
+              :ets.insert(change_cache, {{x, y}, step_num})
+              "#"
+
+            _ ->
+              cell
+          end
       end
     end
   end
 
-  def step(grid, update_rule) do
+  def step(grid, update_rule, step_num) do
     grid
     |> Enum.with_index()
     |> Task.async_stream(fn {line, y} ->
       line
       |> Enum.with_index()
       |> Enum.map(fn {cell, x} ->
-        update_rule.(grid, cell, x, y)
+        update_rule.(grid, cell, x, y, step_num)
       end)
     end)
     |> Enum.map(fn {:ok, next_line} -> next_line end)
   end
 
-  def run_until_stable(grid, update_rule, ray_cache) do
-    next_grid = step(grid, update_rule)
+  def run_until_stable(grid, update_rule, ray_cache, step_num) do
+    next_grid = step(grid, update_rule, step_num)
 
     :ets.delete_all_objects(ray_cache)
     # print_grid(next_grid)
@@ -160,7 +168,7 @@ defmodule Aoc20.Day11 do
     if next_grid == grid do
       next_grid
     else
-      run_until_stable(next_grid, update_rule, ray_cache)
+      run_until_stable(next_grid, update_rule, ray_cache, step_num + 1)
     end
   end
 
@@ -182,6 +190,7 @@ defmodule Aoc20.Day11 do
 
   def run() do
     ray_cache = :ets.new(:ray_cache, [:set, :public])
+    change_cache = :ets.new(:change_cache, [:set, :public])
 
     grid =
       File.read!("inputs/day11.txt")
@@ -190,12 +199,17 @@ defmodule Aoc20.Day11 do
       |> Enum.map(&String.graphemes/1)
 
     part1 =
-      run_until_stable(grid, &next_cell_state_immediate/4, ray_cache)
+      run_until_stable(grid, &next_cell_state_immediate/5, ray_cache, 0)
       |> Enum.map(fn row -> Enum.count(row, &(&1 == "#")) end)
       |> Enum.sum()
 
     part2 =
-      run_until_stable(grid, &next_cell_state_extended(&1, &2, &3, &4, ray_cache), ray_cache)
+      run_until_stable(
+        grid,
+        &next_cell_state_extended(&1, &2, &3, &4, &5, ray_cache, change_cache),
+        ray_cache,
+        0
+      )
       |> Enum.map(fn row -> Enum.count(row, &(&1 == "#")) end)
       |> Enum.sum()
 
