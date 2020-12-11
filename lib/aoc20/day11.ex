@@ -44,26 +44,56 @@ defmodule Aoc20.Day11 do
     end
   end
 
-  def visible_from(grid, x, y) do
+  def closest_with_condition_recursive(grid, x, y, ray_cache, {direction, condition}) do
+    case :ets.lookup(ray_cache, {direction, x, y}) do
+      [{_, cell}] ->
+        cell
+
+      _ ->
+        valid_neighbors =
+          neighborhood(x, y)
+          |> Enum.map(fn [x, y] -> [[x, y], cell_at(grid, x, y)] end)
+          |> Enum.reject(fn [_, cell] -> is_nil(cell) end)
+          |> Enum.filter(fn [loc, _] -> condition.([[x, y], loc]) end)
+
+        case [valid_neighbors, valid_neighbors |> Enum.find(fn [_, cell] -> cell != "." end)] do
+          [_, [_, cell]] ->
+            cell
+
+          [[next_neighbor], _] ->
+            [[next_x, next_y], _] = next_neighbor
+
+            found =
+              closest_with_condition_recursive(
+                grid,
+                next_x,
+                next_y,
+                ray_cache,
+                {direction, condition}
+              )
+
+            :ets.insert(ray_cache, {{direction, x, y}, found})
+
+            found
+
+          [[], nil] ->
+            nil
+        end
+    end
+  end
+
+  def visible_from(grid, sx, sy, ray_cache) do
     [
-      # left
-      fn [cx, cy] -> y == cy && cx < x end,
-      # right
-      fn [cx, cy] -> y == cy && cx > x end,
-      # up
-      fn [cx, cy] -> cy < y && cx == x end,
-      # down
-      fn [cx, cy] -> cy > y && cx == x end,
-      # up-left
-      fn [cx, cy] -> cy < y && cx < x && abs(x - cx) == abs(y - cy) end,
-      # up-right
-      fn [cx, cy] -> cy < y && cx > x && abs(x - cx) == abs(y - cy) end,
-      # down-left
-      fn [cx, cy] -> cy > y && cx < x && abs(x - cx) == abs(y - cy) end,
-      # down-right
-      fn [cx, cy] -> cy > y && cx > x && abs(x - cx) == abs(y - cy) end
+      left: fn [[x, y], [cx, cy]] -> y == cy && cx < x end,
+      right: fn [[x, y], [cx, cy]] -> y == cy && cx > x end,
+      up: fn [[x, y], [cx, cy]] -> cy < y && cx == x end,
+      down: fn [[x, y], [cx, cy]] -> cy > y && cx == x end,
+      up_left: fn [[x, y], [cx, cy]] -> cy < y && cx < x && abs(x - cx) == abs(y - cy) end,
+      up_right: fn [[x, y], [cx, cy]] -> cy < y && cx > x && abs(x - cx) == abs(y - cy) end,
+      down_left: fn [[x, y], [cx, cy]] -> cy > y && cx < x && abs(x - cx) == abs(y - cy) end,
+      down_right: fn [[x, y], [cx, cy]] -> cy > y && cx > x && abs(x - cx) == abs(y - cy) end
     ]
-    |> Enum.map(&closest_with_condition(grid, x, y, &1))
+    |> Enum.map(&closest_with_condition_recursive(grid, sx, sy, ray_cache, &1))
     |> Enum.reject(&is_nil/1)
   end
 
@@ -86,12 +116,12 @@ defmodule Aoc20.Day11 do
     end
   end
 
-  def next_cell_state_extended(grid, cell, x, y) do
+  def next_cell_state_extended(grid, cell, x, y, ray_cache) do
     if cell == "." do
       "."
     else
       occupied_neighbors =
-        visible_from(grid, x, y)
+        visible_from(grid, x, y, ray_cache)
         |> Enum.filter(&(&1 == "#"))
         |> length()
 
@@ -111,28 +141,26 @@ defmodule Aoc20.Day11 do
   def step(grid, update_rule) do
     grid
     |> Enum.with_index()
-    |> Task.async_stream(
-      fn {line, y} ->
-        line
-        |> Enum.with_index()
-        |> Enum.map(fn {cell, x} ->
-          update_rule.(grid, cell, x, y)
-        end)
-      end,
-      max_concurrency: 12
-    )
+    |> Task.async_stream(fn {line, y} ->
+      line
+      |> Enum.with_index()
+      |> Enum.map(fn {cell, x} ->
+        update_rule.(grid, cell, x, y)
+      end)
+    end)
     |> Enum.map(fn {:ok, next_line} -> next_line end)
   end
 
-  def run_until_stable(grid, update_rule) do
+  def run_until_stable(grid, update_rule, ray_cache) do
     next_grid = step(grid, update_rule)
 
-    print_grid(next_grid)
+    :ets.delete_all_objects(ray_cache)
+    # print_grid(next_grid)
 
     if next_grid == grid do
       next_grid
     else
-      run_until_stable(next_grid, update_rule)
+      run_until_stable(next_grid, update_rule, ray_cache)
     end
   end
 
@@ -153,6 +181,8 @@ defmodule Aoc20.Day11 do
   end
 
   def run() do
+    ray_cache = :ets.new(:ray_cache, [:set, :public])
+
     grid =
       File.read!("inputs/day11.txt")
       |> String.trim()
@@ -160,12 +190,12 @@ defmodule Aoc20.Day11 do
       |> Enum.map(&String.graphemes/1)
 
     part1 =
-      run_until_stable(grid, &next_cell_state_immediate/4)
+      run_until_stable(grid, &next_cell_state_immediate/4, ray_cache)
       |> Enum.map(fn row -> Enum.count(row, &(&1 == "#")) end)
       |> Enum.sum()
 
     part2 =
-      run_until_stable(grid, &next_cell_state_extended/4)
+      run_until_stable(grid, &next_cell_state_extended(&1, &2, &3, &4, ray_cache), ray_cache)
       |> Enum.map(fn row -> Enum.count(row, &(&1 == "#")) end)
       |> Enum.sum()
 
