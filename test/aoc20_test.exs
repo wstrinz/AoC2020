@@ -45,4 +45,8 @@ defmodule Aoc20Test do
   test "day11" do
     assert Aoc20.Day11.run() == [2247, 2011]
   end
+
+  test "day12" do
+    assert Aoc20.Day12.run() == [439, 1]
+  end
 end
