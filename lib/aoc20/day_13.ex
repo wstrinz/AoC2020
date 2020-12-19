@@ -55,29 +55,35 @@ defmodule Aoc20.Day13 do
 
   def combined_phased_rotations(a_period, a_phase, b_period, b_phase) do
     [gcd, s, _] = extended_gcd(a_period, b_period)
-    phase_difference = a_phase - b_phase
-    pd_mult = div(phase_difference, gcd)
+    phase_difference = b_phase
+    z = div(phase_difference, gcd)
     pd_remainder = rem(phase_difference, gcd)
+    m = z * s
 
-    IO.puts(a_period)
-    IO.puts(gcd)
-    IO.puts(b_period)
+    # IO.puts(b_phase)
+    # IO.puts(gcd)
+    # IO.puts(s)
+    # IO.puts(m)
 
-    combined_period = div(gcd * b_period, a_period)
+    # IO.puts(b_period)
+
+    # combined_period
+    lcm = div(a_period * b_period, gcd)
 
     if pd_remainder != 0 do
       "no can do"
     else
       [
-        combined_period,
-        Integer.mod(a_phase - s * pd_mult * a_period, combined_period)
+        Integer.mod(m * a_period, lcm),
+        lcm
+        # Integer.mod(a_phase - s * pd_mult * a_period, combined_period)
       ]
     end
   end
 
   def extended_gcd_helper(old_r, old_s, old_t, r, s, t) do
     if r == 0 do
-      [old_r, s, t]
+      [old_r, old_s, old_t]
     else
       quotient = div(old_r, r)
       remainder = rem(old_r, r)
@@ -106,9 +112,13 @@ defmodule Aoc20.Day13 do
   #   return -phase % period
 
   def align_time(bus_a, bus_b, b_offset) do
-    [period, phase] = combined_phased_rotations(bus_a, 0, bus_b, Integer.mod(-b_offset, bus_b))
+    [phase, period] = combined_phased_rotations(bus_a, 0, bus_b, Integer.mod(b_offset, bus_b))
 
-    Integer.mod(-phase, period)
+    IO.puts(phase)
+    IO.puts(period)
+
+    # Integer.mod(-phase, period)
+    phase
   end
 
   def run() do
