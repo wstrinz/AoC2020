@@ -1,6 +1,6 @@
 defmodule Aoc20.Day12 do
-  def go(ship, amount) do
-    case Map.get(ship, :heading) do
+  def go(ship, amount, heading) do
+    case heading do
       0 ->
         %{ship | east: Map.get(ship, :east) + amount}
 
@@ -63,10 +63,10 @@ defmodule Aoc20.Day12 do
         %{ship | east: Map.get(ship, :east) - String.to_integer(amount)}
 
       "F" ->
-        go(ship, String.to_integer(amount))
+        go(ship, String.to_integer(amount), Map.get(ship, :heading))
 
       "B" ->
-        go(ship, -String.to_integer(amount))
+        go(ship, -String.to_integer(amount), Map.get(ship, :heading))
 
       "R" ->
         %{
@@ -113,54 +113,48 @@ defmodule Aoc20.Day12 do
       "F" ->
         %{north: w_north, east: w_east} = waypoint
         %{north: s_north, east: s_east} = ship
-        north_off = w_north - s_north
-        east_off = w_east - s_east
 
         [
           %{
             ship
-            | east: s_east + String.to_integer(amount) * east_off,
-              north: s_north + String.to_integer(amount) * north_off
+            | east: s_east + String.to_integer(amount) * w_east,
+              north: s_north + String.to_integer(amount) * w_north
           },
-          %{
-            waypoint
-            | east: s_east + String.to_integer(amount) * east_off + east_off,
-              north: s_north + String.to_integer(amount) * north_off + north_off
-          }
+          waypoint
         ]
 
       "R" ->
         %{north: w_north, east: w_east} = waypoint
-        %{north: s_north, east: s_east} = ship
+        angle = -String.to_integer(amount) * :math.pi() / 180
 
         new_east =
-          (w_east - s_east) * :math.cos(-String.to_integer(amount)) -
-            (w_north - s_north) * :math.sin(-String.to_integer(amount))
+          w_east * :math.cos(angle) -
+            w_north * :math.sin(angle)
 
         new_north =
-          (w_east - s_east) * :math.sin(-String.to_integer(amount)) +
-            (w_north - s_north) * :math.cos(-String.to_integer(amount))
+          w_east * :math.sin(angle) +
+            w_north * :math.cos(angle)
 
         [
           ship,
-          %{waypoint | east: new_east, north: new_north}
+          %{waypoint | east: round(new_east), north: round(new_north)}
         ]
 
       "L" ->
         %{north: w_north, east: w_east} = waypoint
-        %{north: s_north, east: s_east} = ship
+        angle = String.to_integer(amount) * :math.pi() / 180
 
         new_east =
-          (w_east - s_east) * :math.cos(String.to_integer(amount)) -
-            (w_north - s_north) * :math.sin(String.to_integer(amount))
+          w_east * :math.cos(angle) -
+            w_north * :math.sin(angle)
 
         new_north =
-          (w_east - s_east) * :math.sin(String.to_integer(amount)) +
-            (w_north - s_north) * :math.cos(String.to_integer(amount))
+          w_east * :math.sin(angle) +
+            w_north * :math.cos(angle)
 
         [
           ship,
-          %{waypoint | east: new_east, north: new_north}
+          %{waypoint | east: round(new_east), north: round(new_north)}
         ]
     end
   end
@@ -176,7 +170,7 @@ defmodule Aoc20.Day12 do
     part2 =
       moves
       |> Enum.reduce(
-        [%{east: 0, north: 0}, %{east: 10, north: 0, heading: 0}],
+        [%{east: 0, north: 0}, %{east: 10, north: 1, heading: 0}],
         fn move, acc ->
           next = move_ship_with_waypoint(move, acc)
           IO.inspect(acc)
@@ -186,7 +180,7 @@ defmodule Aoc20.Day12 do
           next
         end
       )
-      |> (fn [_, %{north: north, east: east}] -> abs(north) + abs(east) end).()
+      |> (fn [%{north: north, east: east}, _] -> abs(north) + abs(east) end).()
 
     [part1, part2]
   end
