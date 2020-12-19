@@ -35,7 +35,7 @@ defmodule Aoc20.Day15 do
 
     part1 = play_until(2020, length(input) + 2, 18, starting_speak)
 
-    part2 = "?"
+    part2 = play_until(30_000_000, length(input) + 2, 18, starting_speak)
 
     [part1, part2]
   end
