@@ -172,12 +172,7 @@ defmodule Aoc20.Day12 do
       |> Enum.reduce(
         [%{east: 0, north: 0}, %{east: 10, north: 1, heading: 0}],
         fn move, acc ->
-          next = move_ship_with_waypoint(move, acc)
-          IO.inspect(acc)
-          IO.inspect(move)
-          IO.inspect(next)
-          IO.puts("\n")
-          next
+          move_ship_with_waypoint(move, acc)
         end
       )
       |> (fn [%{north: north, east: east}, _] -> abs(north) + abs(east) end).()
