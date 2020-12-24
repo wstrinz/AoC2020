@@ -41,8 +41,6 @@ defmodule Aoc20.Day16 do
   end
 
   def rules_match?(ticket, rules) do
-    IO.inspect(Enum.at(rules, 0))
-
     ticket
     |> String.split(",")
     |> Enum.with_index()
@@ -51,15 +49,84 @@ defmodule Aoc20.Day16 do
     end)
   end
 
-  def find_rule_assignments(tickets, rules) do
-    all_match = tickets |> Enum.all?(&rules_match?(&1, rules))
+  def error_count(tickets, rules) do
+    tickets
+    |> Enum.map(fn ticket ->
+      ticket
+      |> String.split(",")
+      |> Enum.map(&String.to_integer/1)
+      |> Enum.with_index()
+      |> Enum.reject(fn {val, index} ->
+        matches_rule?(val, Enum.at(rules, index))
+      end)
+      |> Enum.count()
+    end)
+    |> List.flatten()
+    |> Enum.sum()
+  end
 
-    if all_match do
+  def find_rule_assignments(tickets, rules) do
+    if tickets |> Enum.map(&rules_match?(&1, rules)) |> List.flatten() |> Enum.all?() do
       rules
     else
+      names = rules |> Enum.map(fn %{name: name} -> name end)
+      IO.puts("Checked #{names}")
       find_rule_assignments(tickets, Enum.shuffle(rules))
     end
   end
+
+  def hillclimb_find_assignments(tickets, path, rules) do
+    [current_rule | candidate_rules] = rules
+
+    initial_error = error_count(tickets, path ++ rules)
+
+    if initial_error == 0 do
+      path ++ rules
+    else
+      best_candidate =
+        candidate_rules
+        |> Enum.map(fn candidate ->
+          other_rules = candidate_rules |> Enum.filter(&(&1 != candidate))
+          candidate_path = path ++ [current_rule, candidate] ++ other_rules
+          {candidate, error_count(tickets, candidate_path), other_rules}
+        end)
+        |> Enum.sort_by(fn {_, err, _} -> err end)
+        |> Enum.at(0)
+
+      cond do
+        is_nil(best_candidate) ->
+          IO.puts("restart at #{initial_error}")
+
+          hillclimb_find_assignments(tickets, [], (path ++ rules) |> Enum.shuffle())
+
+        elem(best_candidate, 1) == 0 ->
+          path ++ [current_rule, elem(best_candidate, 0)] ++ elem(best_candidate, 2)
+
+        elem(best_candidate, 1) <= initial_error ->
+          hillclimb_find_assignments(
+            tickets,
+            path ++ [current_rule],
+            [elem(best_candidate, 0)] ++ elem(best_candidate, 2)
+          )
+
+        true ->
+          IO.puts("restart at #{initial_error}")
+          hillclimb_find_assignments(tickets, [], (path ++ rules) |> Enum.shuffle())
+      end
+    end
+
+    # if tickets |> Enum.map(&rules_match?(&1, rules)) |> List.flatten() |> Enum.all?() do
+    #   rules
+    # else
+    #   names = rules |> Enum.map(fn %{name: name} -> name end)
+    #   IO.puts("Checked #{names}")
+    #   find_rule_assignments(tickets, Enum.shuffle(rules))
+    # end
+  end
+
+  # def search_rule_tree(tickets, current_rules, remaining_rules, cache) do
+  #   [start_rule | other_rules] = rules
+  # end
 
   def run() do
     [rules, your_ticket, nearby_tickets] =
@@ -76,25 +143,39 @@ defmodule Aoc20.Day16 do
       |> Enum.filter(& &1)
       |> Enum.sum()
 
-    part2 =
+    valid_tickets =
       ((nearby_tickets
         |> String.split("\n")
         |> Enum.slice(1..-1)) ++ [your_ticket |> String.split("\n") |> Enum.slice(1..-1)])
       |> List.flatten()
-      |> find_rule_assignments(parsed_rules)
-      |> Enum.with_index()
-      |> Enum.filter(fn {%{name: name}, _} ->
-        Regex.match?(~r/^departure/, name)
-      end)
-      |> Enum.map(fn {_, idx} ->
-        your_ticket
-        |> String.split("\n")
-        |> Enum.at(1)
+      |> Enum.filter(fn ticket ->
+        ticket
         |> String.split(",")
         |> Enum.map(&String.to_integer/1)
-        |> Enum.at(idx)
+        |> Enum.all?(fn value ->
+          Enum.any?(parsed_rules, &matches_rule?(value, &1))
+        end)
       end)
-      |> Enum.sum()
+
+    part2 =
+      valid_tickets
+      |> hillclimb_find_assignments([], parsed_rules)
+
+    # |> Enum.with_index()
+    # |> Enum.filter(fn {%{name: name}, _} ->
+    #   Regex.match?(~r/^departure/, name)
+    # end)
+    # |> Enum.map(fn {_, idx} ->
+    #   your_ticket
+    #   |> String.split("\n")
+    #   |> Enum.at(1)
+    #   |> String.split(",")
+    #   |> Enum.map(&String.to_integer/1)
+    #   |> Enum.at(idx)
+    # end)
+    # |> Enum.sum()
+
+    # part2 = parsed_rules |> Enum.map(fn %{name: name} -> name end) |> Aoc20.Permutations.of()
 
     [part1, part2]
   end
